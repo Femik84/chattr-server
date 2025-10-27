@@ -1,7 +1,6 @@
 from pathlib import Path
 import os
 
-
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -40,6 +39,7 @@ INSTALLED_APPS = [
     # Third-party
     'rest_framework',
     'corsheaders',
+    'anymail',
 
     # Local apps
     'users',
@@ -146,15 +146,22 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 
-# ==========================================
-# 📧 MAILERSEND SMTP CONFIGURATION
-# ==========================================
+# ====================================================
+# 📧 MAILERSEND EMAIL (HTTP API) CONFIGURATION
+# ====================================================
 
-EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.smtp.EmailBackend")
-EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.mailersend.net")
-EMAIL_PORT = int(os.getenv("EMAIL_PORT", 587))
-EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Chattr <noreply@test-y7zpl98w3pp45vx6.mlsender.net>")
+EMAIL_BACKEND = "anymail.backends.mailersend.EmailBackend"
+
+ANYMAIL = {
+    "MAILERSEND_API_TOKEN": "mlsn.bfa72c62a7b4e127a86874f7bfeeb97eb5b1a04b23057f7a7bd11c4bb47776f9",
+}
+
+DEFAULT_FROM_EMAIL = "Chattr <noreply@test-y7zpl98w3pp45vx6.mlsender.net>"
+
+
+# EMAIL_BACKEND = "anymail.backends.mailersend.EmailBackend"
+# ANYMAIL = {
+#     "MAILERSEND_API_TOKEN": os.getenv("MAILERSEND_API_TOKEN"),
+# }
+# DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "Chattr <noreply@test-y7zpl98w3pp45vx6.mlsender.net>")
 
