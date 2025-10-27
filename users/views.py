@@ -40,34 +40,47 @@ CLIENT_IDS = [
 # -----------------------------
 # GOOGLE AUTHENTICATION
 # -----------------------------
+# -----------------------------
+# GOOGLE AUTHENTICATION (Improved)
+# -----------------------------
 class GoogleAuthView(APIView):
-    """Sign up or log in using a Google account."""
+    """Sign up or log in using a Google account (supports Web + Android)."""
 
     def post(self, request):
         token = request.data.get("id_token")
         if not token:
+            logger.warning("Google login attempt without id_token.")
             return Response({"detail": "Missing id_token"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Verify token without passing a single audience so we can inspect the token's aud
+            # ✅ Step 1: Decode without forcing an audience to inspect token contents
             idinfo = id_token.verify_oauth2_token(token, requests.Request())
 
-            # Ensure the token was issued to one of our client IDs
+            # Log received data for debugging (you'll see this on Render)
+            logger.info("Received Google ID token payload: aud=%s, azp=%s, email=%s",
+                        idinfo.get("aud"), idinfo.get("azp"), idinfo.get("email"))
+
+            # ✅ Step 2: Validate audience
             aud = idinfo.get("aud") or idinfo.get("azp")
             if aud not in CLIENT_IDS:
-                logger.warning("Google token audience mismatch: %s", aud)
-                raise ValueError("Unrecognized client ID")
+                logger.error("❌ Google token audience mismatch: %s", aud)
+                return Response(
+                    {"detail": f"Unrecognized client ID: {aud}"},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
-            # Optional: additional checks (hd, email_verified) can go here
+            # ✅ Step 3: Validate essential fields
             email = idinfo.get("email")
             if not email:
-                raise ValueError("No email present in token")
+                logger.error("❌ Google token missing email field.")
+                return Response({"detail": "No email found in token"}, status=status.HTTP_400_BAD_REQUEST)
 
             first_name = idinfo.get("given_name", "")
             last_name = idinfo.get("family_name", "")
             picture = idinfo.get("picture", "")
             username = email.split("@")[0]
 
+            # ✅ Step 4: Get or create user
             user, created = User.objects.get_or_create(
                 email=email,
                 defaults={
@@ -79,8 +92,15 @@ class GoogleAuthView(APIView):
                 },
             )
 
+            if created:
+                logger.info("✅ Created new Google user: %s", email)
+            else:
+                logger.info("✅ Existing Google user logged in: %s", email)
+
+            # ✅ Step 5: Return JWT tokens
             refresh = RefreshToken.for_user(user)
             serializer = UserSerializer(user)
+
             return Response(
                 {
                     "access": str(refresh.access_token),
@@ -91,14 +111,15 @@ class GoogleAuthView(APIView):
             )
 
         except ValueError as ve:
-            # This is raised when token is invalid or audience mismatch
-            logger.info("Google token verification failed: %s", ve)
-            return Response({"detail": "Invalid Google token"}, status=status.HTTP_400_BAD_REQUEST)
+            # Token validation failed (bad token, expired, etc.)
+            logger.warning("⚠️ Google token validation failed: %s", ve)
+            return Response({"detail": "Invalid or expired Google token"}, status=status.HTTP_400_BAD_REQUEST)
+
         except Exception as exc:
-            # Unexpected error — log for debugging and return generic error
-            logger.exception("Unexpected error in GoogleAuthView: %s", exc)
+            # Unexpected backend error
+            logger.exception("💥 Unexpected error in GoogleAuthView: %s", exc)
             return Response(
-                {"detail": "An error occurred processing the Google token"},
+                {"detail": "Internal server error during Google authentication"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 

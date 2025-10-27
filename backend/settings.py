@@ -1,27 +1,17 @@
 from pathlib import Path
+import os
 
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ====================================================
-# 🔐 SECURITY & CLERK CONFIGURATION
+# 🔐 SECURITY & GENERAL SETTINGS
 # ====================================================
 
 SECRET_KEY = 'django-insecure-@%dp+vlvcp7=$d#p%r6vl0m==@zbl%n64eam^ye)@cfoaf#$%s'
-
 DEBUG = True
-
 ALLOWED_HOSTS = ["*"]
-
 CORS_ALLOW_ALL_ORIGINS = True
-
-# Clerk API Keys (added directly)
-# CLERK_SECRET_KEY = "sk_test_OVvWMbqw89J0CeF4PJvanPG2g2VIYIOZQ5NGr5CwQm"
-# CLERK_PUBLISHABLE_KEY = "pk_test_bWFpbi1zdGFyZmlzaC0yNS5jbGVyay5hY2NvdW50cy5kZXYk"
-# CLERK_JWKS_URL = "https://main-starfish-25.clerk.accounts.dev/.well-known/jwks.json"
-# CLERK_ISSUER = "https://main-starfish-25.clerk.accounts.dev"
-# CLERK_AUDIENCE = "mobile"
-
 
 # ====================================================
 # ⚙️ APPLICATION DEFINITION
@@ -74,7 +64,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'backend.wsgi.application'
 
-
 # ====================================================
 # 🗄️ DATABASE
 # ====================================================
@@ -85,7 +74,6 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
-
 
 # ====================================================
 # 🔒 PASSWORD VALIDATION
@@ -98,7 +86,6 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-
 # ====================================================
 # 🌍 INTERNATIONALIZATION
 # ====================================================
@@ -108,9 +95,7 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
-
 AUTH_USER_MODEL = "users.CustomUser"
-
 
 # ====================================================
 # 🖼️ STATIC & MEDIA FILES
@@ -123,7 +108,6 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
-
 # ====================================================
 # 🧩 REST FRAMEWORK CONFIGURATION
 # ====================================================
@@ -134,20 +118,57 @@ REST_FRAMEWORK = {
     ),
 }
 
-
-
-# ====================================================
-# 🆔 CUSTOM SETTINGS
-# ====================================================
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
+# ====================================================
+# 📧 EMAIL SETTINGS
+# ====================================================
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = "femik84@gmail.com"
-EMAIL_HOST_PASSWORD = "bkmhvrjutfkwfpog"  
+EMAIL_HOST_PASSWORD = "bkmhvrjutfkwfpog"
 DEFAULT_FROM_EMAIL = "noreply@yourdomain.com"
+
+# ====================================================
+# 🪵 LOGGING CONFIGURATION (Important for Render Debugging)
+# ====================================================
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "[{asctime}] {levelname} {name}: {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",  # You’ll see timestamps and levels in Render logs
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",  # Change to DEBUG if you want more details
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": True,
+        },
+        "users": {  # your app name where GoogleAuthView lives
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}
