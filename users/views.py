@@ -1,5 +1,3 @@
-import logging
-
 from django.contrib.auth import get_user_model, authenticate
 from django.core.mail import send_mail
 from django.conf import settings
@@ -22,65 +20,29 @@ from .serializers import (
 )
 from .models import EmailVerificationRequest
 
-logger = logging.getLogger(__name__)
-
 User = get_user_model()
-
-# Accept tokens issued to any of these client IDs (add iOS later if needed)
-CLIENT_IDS = [
-    # Web client ID
-    "158085473947-ue7no55fodi835t0f9lekld8nkms9ip9.apps.googleusercontent.com",
-    # Android client ID
-    "158085473947-4m3urdcetfur74dc0joru7pkf7mc9ccj.apps.googleusercontent.com",
-    # Add iOS client ID here when you support iOS:
-    # "158085473947-em2h1jhpmau9g7bbed84u3qq2io02q7t.apps.googleusercontent.com",
-]
+GOOGLE_CLIENT_ID = "158085473947-4m3urdcetfur74dc0joru7pkf7mc9ccj.apps.googleusercontent.com"
 
 
 # -----------------------------
 # GOOGLE AUTHENTICATION
 # -----------------------------
-# -----------------------------
-# GOOGLE AUTHENTICATION (Improved)
-# -----------------------------
 class GoogleAuthView(APIView):
-    """Sign up or log in using a Google account (supports Web + Android)."""
+    """Sign up or log in using a Google account."""
 
     def post(self, request):
         token = request.data.get("id_token")
         if not token:
-            logger.warning("Google login attempt without id_token.")
             return Response({"detail": "Missing id_token"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # ✅ Step 1: Decode without forcing an audience to inspect token contents
-            idinfo = id_token.verify_oauth2_token(token, requests.Request())
-
-            # Log received data for debugging (you'll see this on Render)
-            logger.info("Received Google ID token payload: aud=%s, azp=%s, email=%s",
-                        idinfo.get("aud"), idinfo.get("azp"), idinfo.get("email"))
-
-            # ✅ Step 2: Validate audience
-            aud = idinfo.get("aud") or idinfo.get("azp")
-            if aud not in CLIENT_IDS:
-                logger.error("❌ Google token audience mismatch: %s", aud)
-                return Response(
-                    {"detail": f"Unrecognized client ID: {aud}"},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-            # ✅ Step 3: Validate essential fields
-            email = idinfo.get("email")
-            if not email:
-                logger.error("❌ Google token missing email field.")
-                return Response({"detail": "No email found in token"}, status=status.HTTP_400_BAD_REQUEST)
-
+            idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
+            email = idinfo["email"]
             first_name = idinfo.get("given_name", "")
             last_name = idinfo.get("family_name", "")
             picture = idinfo.get("picture", "")
             username = email.split("@")[0]
 
-            # ✅ Step 4: Get or create user
             user, created = User.objects.get_or_create(
                 email=email,
                 defaults={
@@ -92,15 +54,8 @@ class GoogleAuthView(APIView):
                 },
             )
 
-            if created:
-                logger.info("✅ Created new Google user: %s", email)
-            else:
-                logger.info("✅ Existing Google user logged in: %s", email)
-
-            # ✅ Step 5: Return JWT tokens
             refresh = RefreshToken.for_user(user)
             serializer = UserSerializer(user)
-
             return Response(
                 {
                     "access": str(refresh.access_token),
@@ -110,18 +65,8 @@ class GoogleAuthView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        except ValueError as ve:
-            # Token validation failed (bad token, expired, etc.)
-            logger.warning("⚠️ Google token validation failed: %s", ve)
-            return Response({"detail": "Invalid or expired Google token"}, status=status.HTTP_400_BAD_REQUEST)
-
-        except Exception as exc:
-            # Unexpected backend error
-            logger.exception("💥 Unexpected error in GoogleAuthView: %s", exc)
-            return Response(
-                {"detail": "Internal server error during Google authentication"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        except ValueError:
+            return Response({"detail": "Invalid Google token"}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # -----------------------------
@@ -132,7 +77,6 @@ class EmailSignupView(APIView):
     Collect user data and send verification code.
     Creates a temporary EmailVerificationRequest entry (not the real user yet).
     """
-
     def post(self, request):
         serializer = EmailSignupSerializer(data=request.data)
         if serializer.is_valid():
@@ -148,7 +92,6 @@ class VerifyEmailView(APIView):
     """
     Verify the email and create the user after successful code validation.
     """
-
     def post(self, request):
         serializer = EmailVerificationConfirmSerializer(data=request.data)
         if serializer.is_valid():
@@ -194,7 +137,6 @@ class EmailLoginView(APIView):
 # -----------------------------
 class MeView(APIView):
     """Retrieve or update current user's profile."""
-
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -214,7 +156,6 @@ class MeView(APIView):
 # -----------------------------
 class FollowToggleView(APIView):
     """Follow or unfollow another user."""
-
     permission_classes = [IsAuthenticated]
 
     def post(self, request, user_id):
