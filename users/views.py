@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.auth import get_user_model, authenticate
 from django.core.mail import send_mail
 from django.conf import settings
@@ -20,8 +22,19 @@ from .serializers import (
 )
 from .models import EmailVerificationRequest
 
+logger = logging.getLogger(__name__)
+
 User = get_user_model()
-GOOGLE_CLIENT_ID = "158085473947-4m3urdcetfur74dc0joru7pkf7mc9ccj.apps.googleusercontent.com"
+
+# Accept tokens issued to any of these client IDs (add iOS later if needed)
+CLIENT_IDS = [
+    # Web client ID
+    "158085473947-ue7no55fodi835t0f9lekld8nkms9ip9.apps.googleusercontent.com",
+    # Android client ID
+    "158085473947-4m3urdcetfur74dc0joru7pkf7mc9ccj.apps.googleusercontent.com",
+    # Add iOS client ID here when you support iOS:
+    # "158085473947-em2h1jhpmau9g7bbed84u3qq2io02q7t.apps.googleusercontent.com",
+]
 
 
 # -----------------------------
@@ -36,8 +49,20 @@ class GoogleAuthView(APIView):
             return Response({"detail": "Missing id_token"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            idinfo = id_token.verify_oauth2_token(token, requests.Request(), GOOGLE_CLIENT_ID)
-            email = idinfo["email"]
+            # Verify token without passing a single audience so we can inspect the token's aud
+            idinfo = id_token.verify_oauth2_token(token, requests.Request())
+
+            # Ensure the token was issued to one of our client IDs
+            aud = idinfo.get("aud") or idinfo.get("azp")
+            if aud not in CLIENT_IDS:
+                logger.warning("Google token audience mismatch: %s", aud)
+                raise ValueError("Unrecognized client ID")
+
+            # Optional: additional checks (hd, email_verified) can go here
+            email = idinfo.get("email")
+            if not email:
+                raise ValueError("No email present in token")
+
             first_name = idinfo.get("given_name", "")
             last_name = idinfo.get("family_name", "")
             picture = idinfo.get("picture", "")
@@ -65,8 +90,17 @@ class GoogleAuthView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        except ValueError:
+        except ValueError as ve:
+            # This is raised when token is invalid or audience mismatch
+            logger.info("Google token verification failed: %s", ve)
             return Response({"detail": "Invalid Google token"}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            # Unexpected error — log for debugging and return generic error
+            logger.exception("Unexpected error in GoogleAuthView: %s", exc)
+            return Response(
+                {"detail": "An error occurred processing the Google token"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 # -----------------------------
@@ -77,6 +111,7 @@ class EmailSignupView(APIView):
     Collect user data and send verification code.
     Creates a temporary EmailVerificationRequest entry (not the real user yet).
     """
+
     def post(self, request):
         serializer = EmailSignupSerializer(data=request.data)
         if serializer.is_valid():
@@ -92,6 +127,7 @@ class VerifyEmailView(APIView):
     """
     Verify the email and create the user after successful code validation.
     """
+
     def post(self, request):
         serializer = EmailVerificationConfirmSerializer(data=request.data)
         if serializer.is_valid():
@@ -137,6 +173,7 @@ class EmailLoginView(APIView):
 # -----------------------------
 class MeView(APIView):
     """Retrieve or update current user's profile."""
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
@@ -156,6 +193,7 @@ class MeView(APIView):
 # -----------------------------
 class FollowToggleView(APIView):
     """Follow or unfollow another user."""
+
     permission_classes = [IsAuthenticated]
 
     def post(self, request, user_id):
