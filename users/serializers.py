@@ -1,15 +1,15 @@
 from rest_framework import serializers
+from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
-from django.contrib.auth.hashers import make_password
+from django.contrib.auth.hashers import make_password, check_password
 import random
 from datetime import timedelta
 from .models import CustomUser, EmailVerificationRequest
-from .email import send_email  # import the helper
 
 
 # -------------------------------
-# Basic User Serializer
+# Basic User Serializer (read-only followers)
 # -------------------------------
 class UserSerializer(serializers.ModelSerializer):
     followers = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
@@ -17,9 +17,17 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = [
-            "id", "username", "first_name", "last_name", "email",
-            "profile_picture", "banner_image", "bio", "location",
-            "followers", "created_at"
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "email",
+            "profile_picture",
+            "banner_image",
+            "bio",
+            "location",
+            "followers",
+            "created_at",
         ]
         read_only_fields = ["created_at", "followers"]
 
@@ -43,12 +51,15 @@ class EmailSignupSerializer(serializers.Serializer):
         return value
 
     def save(self):
+        """Creates or updates a verification request entry."""
         email = self.validated_data["email"]
         code = str(random.randint(100000, 999999))
+
+        # Hash password before saving
         password_hash = make_password(self.validated_data["password"])
         expires_at = timezone.now() + timedelta(minutes=15)
 
-        # Remove old verification requests
+        # Delete any existing verification request for this email
         EmailVerificationRequest.objects.filter(email=email).delete()
 
         EmailVerificationRequest.objects.create(
@@ -65,10 +76,12 @@ class EmailSignupSerializer(serializers.Serializer):
         )
 
         # Send verification email
-        send_email(
-            to_email=email,
+        send_mail(
             subject="Verify your email",
-            message=f"Your verification code is: {code}"
+            message=f"Your verification code is: {code}",
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            fail_silently=True,
         )
 
         return {"detail": "Verification code sent to email."}
@@ -97,6 +110,7 @@ class EmailVerificationConfirmSerializer(serializers.Serializer):
 
     def save(self):
         entry = self.request_entry
+        # Create the verified user
         user = CustomUser.objects.create(
             email=entry.email,
             username=entry.email,
@@ -110,8 +124,18 @@ class EmailVerificationConfirmSerializer(serializers.Serializer):
         )
         user.password = entry.password_hash
         user.save()
+
+        # Clean up temp record
         entry.delete()
+
         return {"detail": "Email verified successfully. Account created."}
+
+
+
+
+
+
+
 
 
 # -------------------------------
@@ -130,11 +154,13 @@ class PasswordResetRequestSerializer(serializers.Serializer):
     def save(self):
         if self.user:
             code = self.user.create_password_reset_code()
-            send_email(
-                to_email=self.user.email,
+            send_mail(
                 subject="Your Password Reset Code",
                 message=f"Hello {self.user.first_name or self.user.username},\n\n"
-                        f"Your password reset code is: {code}\nIt expires in 15 minutes."
+                        f"Your password reset code is: {code}\nIt expires in 15 minutes.",
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[self.user.email],
+                fail_silently=True,
             )
         return {"detail": "If an account with that email exists, a reset code has been sent."}
 
@@ -166,7 +192,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
 
 # -------------------------------
-# Update Profile Serializer
+# Update Profile Serializer (authenticated user)
 # -------------------------------
 class UserUpdateSerializer(serializers.ModelSerializer):
     profile_picture = serializers.ImageField(required=False, allow_null=True)
@@ -177,8 +203,13 @@ class UserUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = [
-            "username", "first_name", "last_name",
-            "profile_picture", "banner_image", "bio", "location"
+            "username",
+            "first_name",
+            "last_name",
+            "profile_picture",
+            "banner_image",
+            "bio",
+            "location",
         ]
 
     def update(self, instance, validated_data):
