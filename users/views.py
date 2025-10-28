@@ -14,11 +14,9 @@ from .serializers import (
     UserSerializer,
     UserUpdateSerializer,
     EmailSignupSerializer,
-    EmailVerificationConfirmSerializer,
     PasswordResetRequestSerializer,
     PasswordResetConfirmSerializer,
 )
-from .models import EmailVerificationRequest
 
 User = get_user_model()
 GOOGLE_CLIENT_ID = "158085473947-ue7no55fodi835t0f9lekld8nkms9ip9.apps.googleusercontent.com"
@@ -69,35 +67,36 @@ class GoogleAuthView(APIView):
             return Response({"detail": "Invalid Google token"}, status=status.HTTP_400_BAD_REQUEST)
 
 
-# -----------------------------
-# EMAIL SIGNUP (Step 1)
-# -----------------------------
 class EmailSignupView(APIView):
     """
-    Collect user data and send verification code.
-    Creates a temporary EmailVerificationRequest entry (not the real user yet).
+    Register a new user immediately (no verification code).
     """
     def post(self, request):
         serializer = EmailSignupSerializer(data=request.data)
         if serializer.is_valid():
-            result = serializer.save()
-            return Response(result, status=status.HTTP_200_OK)
+            user = serializer.save()  # this will create the user directly
+
+            # Mark as verified since no code step
+            user.is_email_verified = True
+            user.save()
+
+            # Generate JWT tokens
+            refresh = RefreshToken.for_user(user)
+            user_data = UserSerializer(user).data
+
+            return Response(
+                {
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                    "user": user_data,
+                },
+                status=status.HTTP_201_CREATED,
+            )
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-# -----------------------------
-# EMAIL VERIFICATION (Step 2)
-# -----------------------------
-class VerifyEmailView(APIView):
-    """
-    Verify the email and create the user after successful code validation.
-    """
-    def post(self, request):
-        serializer = EmailVerificationConfirmSerializer(data=request.data)
-        if serializer.is_valid():
-            result = serializer.save()
-            return Response(result, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 # -----------------------------

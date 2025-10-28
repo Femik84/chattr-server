@@ -4,11 +4,10 @@ from .views import (
     GoogleAuthView,
     MeView,
     EmailSignupView,
-    VerifyEmailView,
     EmailLoginView,
     PasswordResetRequestView,
     PasswordResetConfirmView,
-    FollowToggleView,  # new
+    FollowToggleView,
 )
 
 urlpatterns = [
@@ -17,7 +16,6 @@ urlpatterns = [
 
     # Email/password auth
     path("signup/", EmailSignupView.as_view(), name="email-signup"),
-    path("verify-email/", VerifyEmailView.as_view(), name="verify-email"),
     path("login/", EmailLoginView.as_view(), name="email-login"),
 
     # Password reset

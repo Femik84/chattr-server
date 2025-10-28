@@ -13,7 +13,7 @@ class CustomUser(AbstractUser):
     # Profile fields
     first_name = models.CharField(max_length=150, blank=True)
     last_name = models.CharField(max_length=150, blank=True)
-    username = models.CharField(max_length=150, unique=True, blank=False)
+    username = models.CharField(max_length=150, unique=True)
     profile_picture = models.ImageField(upload_to="profile_pictures/", blank=True, null=True)
     banner_image = models.ImageField(upload_to="banner_images/", blank=True, null=True)
     bio = models.TextField(blank=True)
@@ -30,7 +30,7 @@ class CustomUser(AbstractUser):
     created_at = models.DateTimeField(auto_now_add=True)
 
     # Email verification status
-    is_email_verified = models.BooleanField(default=False)
+    is_email_verified = models.BooleanField(default=True)  # now auto-verified at signup
 
     # Password reset
     reset_password_code_hash = models.CharField(max_length=128, blank=True, null=True)
@@ -60,26 +60,3 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.username or self.email
-
-
-# -----------------------------
-# Temporary table for email verification
-# -----------------------------
-class EmailVerificationRequest(models.Model):
-    email = models.EmailField(unique=True)
-    password_hash = models.CharField(max_length=128)  # store hashed password
-    first_name = models.CharField(max_length=150, blank=True)
-    last_name = models.CharField(max_length=150, blank=True)
-    profile_picture = models.ImageField(upload_to="temp_profile_pictures/", blank=True, null=True)
-    banner_image = models.ImageField(upload_to="temp_banner_images/", blank=True, null=True)
-    bio = models.TextField(blank=True)
-    location = models.CharField(max_length=255, blank=True)
-    verification_code = models.CharField(max_length=6)
-    expires_at = models.DateTimeField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def is_expired(self):
-        return timezone.now() > self.expires_at
-
-    def __str__(self):
-        return f"{self.email} ({'expired' if self.is_expired() else 'pending'})"
