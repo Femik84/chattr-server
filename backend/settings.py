@@ -10,7 +10,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = "django-insecure-@%dp+vlvcp7=$d#p%r6vl0m==@zbl%n64eam^ye)@cfoaf#$%s"
 DEBUG = True
 # With this (use your actual LAN IP)
-ALLOWED_HOSTS = ['192.168.43.110', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['192.168.43.110', 'localhost', '127.0.0.1', "chattr-server-cukt.onrender.com",]
 
 # Or add BASE_URL setting
 BASE_URL = 'http://192.168.43.110:8000'
