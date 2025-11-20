@@ -6,7 +6,6 @@ from .models import CustomUser
 class CustomUserAdmin(UserAdmin):
     model = CustomUser
 
-    # Fields to display in the user list
     list_display = (
         'username', 'email', 'first_name', 'last_name', 'is_staff', 'is_active', 'created_at'
     )
@@ -14,32 +13,32 @@ class CustomUserAdmin(UserAdmin):
     search_fields = ('username', 'email', 'first_name', 'last_name')
     ordering = ('username',)
 
-    # Fields grouped in the detail view
     fieldsets = (
         (None, {'fields': ('username', 'password')}),
         ('Personal info', {
             'fields': (
-                'first_name', 'last_name', 'email', 
+                'first_name', 'last_name', 'email',
                 'profile_picture', 'banner_image', 'bio', 'location'
             )
         }),
         ('Social', {
             'fields': ('followers',)
         }),
-        ('Permissions', {'fields': ('is_staff', 'is_active', 'is_superuser', 'groups', 'user_permissions')}),
+        ('Permissions', {
+            'fields': ('is_staff', 'is_active', 'is_superuser', 'groups', 'user_permissions')
+        }),
         ('Important dates', {'fields': ('last_login', 'date_joined', 'created_at')}),
     )
 
-    # Fields when creating a new user in admin
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
             'fields': (
-                'username', 'first_name', 'last_name', 'email', 
+                'username', 'first_name', 'last_name', 'email',
                 'password1', 'password2', 'is_staff', 'is_active'
             ),
         }),
     )
 
-    # Make followers read-only to avoid accidental changes in admin
-    readonly_fields = ('followers', 'created_at')
+    readonly_fields = ('created_at',)  # allow editing followers
+    filter_horizontal = ('followers', 'groups', 'user_permissions')

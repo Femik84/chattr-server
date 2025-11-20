@@ -8,6 +8,7 @@ from .views import (
     PasswordResetRequestView,
     PasswordResetConfirmView,
     FollowToggleView,
+    UserDetailView,
 )
 
 urlpatterns = [
@@ -30,4 +31,7 @@ urlpatterns = [
 
     # Follow/unfollow user
     path("follow/<int:user_id>/", FollowToggleView.as_view(), name="follow-toggle"),
+     
+    # get user by username 
+    path("<str:username>/", UserDetailView.as_view(), name="user-detail"),
 ]

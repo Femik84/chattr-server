@@ -1,4 +1,4 @@
-from django.contrib.auth import get_user_model, authenticate
+from django.contrib.auth import get_user_model
 from django.core.mail import send_mail
 from django.conf import settings
 from google.oauth2 import id_token
@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser, FormParser 
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from .serializers import (
@@ -53,7 +54,7 @@ class GoogleAuthView(APIView):
             )
 
             refresh = RefreshToken.for_user(user)
-            serializer = UserSerializer(user)
+            serializer = UserSerializer(user, context={"request": request})
             return Response(
                 {
                     "access": str(refresh.access_token),
@@ -67,22 +68,21 @@ class GoogleAuthView(APIView):
             return Response({"detail": "Invalid Google token"}, status=status.HTTP_400_BAD_REQUEST)
 
 
+# -----------------------------
+# EMAIL SIGNUP
+# -----------------------------
 class EmailSignupView(APIView):
-    """
-    Register a new user immediately (no verification code).
-    """
+    """Register a new user immediately (no verification code)."""
+
     def post(self, request):
         serializer = EmailSignupSerializer(data=request.data)
         if serializer.is_valid():
-            user = serializer.save()  # this will create the user directly
-
-            # Mark as verified since no code step
+            user = serializer.save()
             user.is_email_verified = True
             user.save()
 
-            # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
-            user_data = UserSerializer(user).data
+            user_data = UserSerializer(user, context={"request": request}).data
 
             return Response(
                 {
@@ -96,11 +96,8 @@ class EmailSignupView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-
-
-
 # -----------------------------
-# EMAIL LOGIN
+# EMAIL LOGIN (email + password)
 # -----------------------------
 class EmailLoginView(APIView):
     """Log in with email and password (only if email verified)."""
@@ -110,17 +107,27 @@ class EmailLoginView(APIView):
         password = request.data.get("password")
 
         if not email or not password:
-            return Response({"detail": "Email and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "Email and password are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
-        user = authenticate(request, username=email, password=password)
-        if not user:
+        try:
+            user = User.objects.get(email__iexact=email)
+        except User.DoesNotExist:
             return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not user.check_password(password):
+            return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        if not user.is_active:
+            return Response({"detail": "Account disabled."}, status=status.HTTP_403_FORBIDDEN)
 
         if not user.is_email_verified:
             return Response({"detail": "Email not verified."}, status=status.HTTP_403_FORBIDDEN)
 
         refresh = RefreshToken.for_user(user)
-        serializer = UserSerializer(user)
+        serializer = UserSerializer(user, context={"request": request})
         return Response(
             {
                 "access": str(refresh.access_token),
@@ -137,16 +144,18 @@ class EmailLoginView(APIView):
 class MeView(APIView):
     """Retrieve or update current user's profile."""
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]  # ✅ Allows file + text data
 
     def get(self, request):
-        serializer = UserSerializer(request.user)
+        serializer = UserSerializer(request.user, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
     def patch(self, request):
         serializer = UserUpdateSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            updated_user = UserSerializer(request.user, context={"request": request}).data
+            return Response(updated_user, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -195,3 +204,20 @@ class PasswordResetConfirmView(APIView):
             result = serializer.save()
             return Response(result, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# -----------------------------
+# GET USER BY USERNAME
+# -----------------------------
+class UserDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, username):
+        try:
+            user = User.objects.get(username=username)
+        except User.DoesNotExist:
+            return Response({"detail": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = UserSerializer(user, context={"request": request})
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
