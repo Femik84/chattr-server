@@ -1,26 +1,31 @@
 from pathlib import Path
+from datetime import timedelta
 
-# Base directory
+# ====================================================
+# 📂 BASE DIRECTORY
+# ====================================================
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ====================================================
 # 🔐 SECURITY
 # ====================================================
-
 SECRET_KEY = "django-insecure-@%dp+vlvcp7=$d#p%r6vl0m==@zbl%n64eam^ye)@cfoaf#$%s"
 DEBUG = True
-# With this (use your actual LAN IP)
-ALLOWED_HOSTS = ['192.168.43.110', 'localhost', '127.0.0.1', "chattr-server-cukt.onrender.com", ".onrender.com",]
 
-# Or add BASE_URL setting
+ALLOWED_HOSTS = [
+    '192.168.43.110',
+    'localhost',
+    '127.0.0.1',
+    "chattr-server-cukt.onrender.com",
+    ".onrender.com",
+]
+
 BASE_URL = 'http://192.168.43.110:8000'
-
 CORS_ALLOW_ALL_ORIGINS = True
 
 # ====================================================
 # ⚙️ APPLICATION DEFINITION
 # ====================================================
-
 INSTALLED_APPS = [
     # Channels / ASGI — MUST BE FIRST
     "daphne",
@@ -44,7 +49,7 @@ INSTALLED_APPS = [
     "comments",
     "notifications",
     "messaging",
-    "search", 
+    "search",
 ]
 
 MIDDLEWARE = [
@@ -83,7 +88,6 @@ ASGI_APPLICATION = "backend.asgi.application"
 # ====================================================
 # 🗄️ DATABASE
 # ====================================================
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -94,7 +98,6 @@ DATABASES = {
 # ====================================================
 # 🔒 PASSWORD VALIDATION
 # ====================================================
-
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -105,7 +108,6 @@ AUTH_PASSWORD_VALIDATORS = [
 # ====================================================
 # 🌍 INTERNATIONALIZATION
 # ====================================================
-
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
@@ -116,7 +118,6 @@ AUTH_USER_MODEL = "users.CustomUser"
 # ====================================================
 # 🖼️ STATIC & MEDIA FILES
 # ====================================================
-
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
@@ -127,7 +128,6 @@ MEDIA_ROOT = BASE_DIR / "media"
 # ====================================================
 # 🧩 REST FRAMEWORK
 # ====================================================
-
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
@@ -135,15 +135,16 @@ REST_FRAMEWORK = {
 }
 
 # ====================================================
-# 📡 CHANNEL LAYERS (Redis WebSocket backend)
+# 📡 CHANNEL LAYERS (Upstash Redis)
 # ====================================================
-# Uncomment this later after installing Redis
-
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
+            "hosts": [
+                # Hardcoded Upstash Redis URL with TLS
+                "rediss://default:AYNEAAIncDI3MGRmZTY0Y2RiZWY0OTA4YTg1ZDJlNzA2ZGI0YTk0NHAyMzM2MDQ@liberal-chipmunk-33604.upstash.io:6379"
+            ],
         },
     },
 }
@@ -151,13 +152,11 @@ CHANNEL_LAYERS = {
 # ====================================================
 # 🆔 DEFAULT SETTINGS
 # ====================================================
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ====================================================
 # 📧 EMAIL SETTINGS
 # ====================================================
-
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
@@ -166,11 +165,11 @@ EMAIL_HOST_USER = "femik84@gmail.com"
 EMAIL_HOST_PASSWORD = "bkmhvrjutfkwfpog"
 DEFAULT_FROM_EMAIL = "noreply@yourdomain.com"
 
-
-from datetime import timedelta
-
+# ====================================================
+# 🕒 SIMPLE JWT
+# ====================================================
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=20),      
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),         
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=20),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
