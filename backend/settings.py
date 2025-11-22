@@ -161,31 +161,31 @@ REST_FRAMEWORK = {
 # ====================================================
 # CHANNEL LAYERS
 # ====================================================
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [("127.0.0.1", 6379)],
-        },
-    },
-}
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
+#         "CONFIG": {
+#             "hosts": [("127.0.0.1", 6379)],
+#         },
+#     },
+# }
 
 
 
 # ====================================================
 # 📡 CHANNEL LAYERS (Upstash Redis)
 # ====================================================
-# CHANNEL_LAYERS = {
-#     "default": {
-#         "BACKEND": "channels_redis.core.RedisChannelLayer",
-#         "CONFIG": {
-#             "hosts": [
-#                 # Hardcoded Upstash Redis URL with TLS
-#                 "rediss://default:AYNEAAIncDI3MGRmZTY0Y2RiZWY0OTA4YTg1ZDJlNzA2ZGI0YTk0NHAyMzM2MDQ@liberal-chipmunk-33604.upstash.io:6379"
-#             ],
-#         },
-#     },
-# }
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [
+                # Hardcoded Upstash Redis URL with TLS
+                "rediss://default:AYNEAAIncDI3MGRmZTY0Y2RiZWY0OTA4YTg1ZDJlNzA2ZGI0YTk0NHAyMzM2MDQ@liberal-chipmunk-33604.upstash.io:6379"
+            ],
+        },
+    },
+}
 
 # ====================================================
 # EMAIL SETTINGS
