@@ -20,7 +20,7 @@ from .serializers import (
 )
 
 User = get_user_model()
-GOOGLE_CLIENT_ID = "158085473947-ue7no55fodi835t0f9lekld8nkms9ip9.apps.googleusercontent.com"
+GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID
 
 
 # -----------------------------

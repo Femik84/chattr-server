@@ -206,3 +206,6 @@ SIMPLE_JWT = {
 }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
+
