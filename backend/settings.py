@@ -1,6 +1,11 @@
 from pathlib import Path
 from datetime import timedelta
+from dotenv import load_dotenv
 import cloudinary
+import os
+
+# Load .env
+load_dotenv()
 
 # ====================================================
 # BASE DIRECTORY
@@ -10,8 +15,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ====================================================
 # SECURITY
 # ====================================================
-SECRET_KEY = "django-insecure-@%dp+vlvcp7=$d#p%r6vl0m==@zbl%n64eam^ye)@cfoaf#$%s"
-DEBUG = True
+SECRET_KEY = os.getenv("SECRET_KEY")
+DEBUG = os.getenv("DEBUG", "False") == "True"
+
 ALLOWED_HOSTS = [
     '192.168.43.110',
     'localhost',
@@ -122,12 +128,9 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 STORAGES = {
-    # Media (uploads)
     "default": {
         "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
     },
-
-    # Static files
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
@@ -136,18 +139,19 @@ STORAGES = {
 # ====================================================
 # CLOUDINARY CONFIG
 # ====================================================
-CLOUDINARY_STORAGE = {
-    "CLOUD_NAME": "dhazpsb4d",
-    "API_KEY": "121798156135788",
-    "API_SECRET": "alTPWNg_EGaxG2-8gRk0gYQqYVs",
-}
-
 cloudinary.config(
-    cloud_name=CLOUDINARY_STORAGE["CLOUD_NAME"],
-    api_key=CLOUDINARY_STORAGE["API_KEY"],
-    api_secret=CLOUDINARY_STORAGE["API_SECRET"],
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
     secure=True,
 )
+
+# Used by cloudinary_storage
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": os.getenv("CLOUDINARY_CLOUD_NAME"),
+    "API_KEY": os.getenv("CLOUDINARY_API_KEY"),
+    "API_SECRET": os.getenv("CLOUDINARY_API_SECRET"),
+}
 
 # ====================================================
 # REST FRAMEWORK
@@ -155,34 +159,27 @@ cloudinary.config(
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-    )
+    ),
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "20/minute",
+        "user": "200/minute",
+    },
 }
 
 # ====================================================
 # CHANNEL LAYERS
 # ====================================================
-# CHANNEL_LAYERS = {
-#     "default": {
-#         "BACKEND": "channels_redis.core.RedisChannelLayer",
-#         "CONFIG": {
-#             "hosts": [("127.0.0.1", 6379)],
-#         },
-#     },
-# }
+REDIS_URL = os.getenv("REDIS_URL")
 
-
-
-# ====================================================
-# 📡 CHANNEL LAYERS (Upstash Redis)
-# ====================================================
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [
-                # Hardcoded Upstash Redis URL with TLS
-                "rediss://default:AYNEAAIncDI3MGRmZTY0Y2RiZWY0OTA4YTg1ZDJlNzA2ZGI0YTk0NHAyMzM2MDQ@liberal-chipmunk-33604.upstash.io:6379"
-            ],
+            "hosts": [REDIS_URL],
         },
     },
 }
@@ -194,8 +191,9 @@ EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = "femik84@gmail.com"
-EMAIL_HOST_PASSWORD = "bkmhvrjutfkwfpog"
+
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = "noreply@yourdomain.com"
 
 # ====================================================
