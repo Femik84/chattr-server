@@ -8,7 +8,7 @@ User = settings.AUTH_USER_MODEL
 # Hashtag model
 # -------------------------------
 class Hashtag(models.Model):
-    name = models.CharField(max_length=100, unique=True)  # store without the '#' symbol
+    name = models.CharField(max_length=100, unique=True)  
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

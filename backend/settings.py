@@ -1,17 +1,17 @@
 from pathlib import Path
 from datetime import timedelta
+import cloudinary
 
 # ====================================================
-# 📂 BASE DIRECTORY
+# BASE DIRECTORY
 # ====================================================
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # ====================================================
-# 🔐 SECURITY
+# SECURITY
 # ====================================================
 SECRET_KEY = "django-insecure-@%dp+vlvcp7=$d#p%r6vl0m==@zbl%n64eam^ye)@cfoaf#$%s"
 DEBUG = True
-
 ALLOWED_HOSTS = [
     '192.168.43.110',
     'localhost',
@@ -20,18 +20,17 @@ ALLOWED_HOSTS = [
     ".onrender.com",
 ]
 
-BASE_URL = 'http://192.168.43.110:8000'
 CORS_ALLOW_ALL_ORIGINS = True
 
 # ====================================================
-# ⚙️ APPLICATION DEFINITION
+# APPLICATIONS
 # ====================================================
 INSTALLED_APPS = [
-    # Channels / ASGI — MUST BE FIRST
+    # Channels
     "daphne",
     "channels",
 
-    # Django apps
+    # Django
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -39,11 +38,13 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    # Third-party apps
+    # Third-party
+    "cloudinary",
+    "cloudinary_storage",
     "rest_framework",
     "corsheaders",
 
-    # Local apps
+    # Local
     "users",
     "posts",
     "comments",
@@ -86,7 +87,7 @@ WSGI_APPLICATION = "backend.wsgi.application"
 ASGI_APPLICATION = "backend.asgi.application"
 
 # ====================================================
-# 🗄️ DATABASE
+# DATABASE
 # ====================================================
 DATABASES = {
     "default": {
@@ -96,7 +97,7 @@ DATABASES = {
 }
 
 # ====================================================
-# 🔒 PASSWORD VALIDATION
+# PASSWORD VALIDATORS
 # ====================================================
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -106,27 +107,50 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 # ====================================================
-# 🌍 INTERNATIONALIZATION
+# INTERNATIONALIZATION
 # ====================================================
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_I18N = True
 USE_TZ = True
-
 AUTH_USER_MODEL = "users.CustomUser"
 
 # ====================================================
-# 🖼️ STATIC & MEDIA FILES
+# STATIC & MEDIA FILES
 # ====================================================
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+STORAGES = {
+    # Media (uploads)
+    "default": {
+        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+    },
+
+    # Static files
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # ====================================================
-# 🧩 REST FRAMEWORK
+# CLOUDINARY CONFIG
+# ====================================================
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": "dhazpsb4d",
+    "API_KEY": "121798156135788",
+    "API_SECRET": "alTPWNg_EGaxG2-8gRk0gYQqYVs",
+}
+
+cloudinary.config(
+    cloud_name=CLOUDINARY_STORAGE["CLOUD_NAME"],
+    api_key=CLOUDINARY_STORAGE["API_KEY"],
+    api_secret=CLOUDINARY_STORAGE["API_SECRET"],
+    secure=True,
+)
+
+# ====================================================
+# REST FRAMEWORK
 # ====================================================
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -135,27 +159,36 @@ REST_FRAMEWORK = {
 }
 
 # ====================================================
-# 📡 CHANNEL LAYERS (Upstash Redis)
+# CHANNEL LAYERS
 # ====================================================
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [
-                # Hardcoded Upstash Redis URL with TLS
-                "rediss://default:AYNEAAIncDI3MGRmZTY0Y2RiZWY0OTA4YTg1ZDJlNzA2ZGI0YTk0NHAyMzM2MDQ@liberal-chipmunk-33604.upstash.io:6379"
-            ],
+            "hosts": [("127.0.0.1", 6379)],
         },
     },
 }
 
-# ====================================================
-# 🆔 DEFAULT SETTINGS
-# ====================================================
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
 
 # ====================================================
-# 📧 EMAIL SETTINGS
+# 📡 CHANNEL LAYERS (Upstash Redis)
+# ====================================================
+# CHANNEL_LAYERS = {
+#     "default": {
+#         "BACKEND": "channels_redis.core.RedisChannelLayer",
+#         "CONFIG": {
+#             "hosts": [
+#                 # Hardcoded Upstash Redis URL with TLS
+#                 "rediss://default:AYNEAAIncDI3MGRmZTY0Y2RiZWY0OTA4YTg1ZDJlNzA2ZGI0YTk0NHAyMzM2MDQ@liberal-chipmunk-33604.upstash.io:6379"
+#             ],
+#         },
+#     },
+# }
+
+# ====================================================
+# EMAIL SETTINGS
 # ====================================================
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
@@ -166,10 +199,12 @@ EMAIL_HOST_PASSWORD = "bkmhvrjutfkwfpog"
 DEFAULT_FROM_EMAIL = "noreply@yourdomain.com"
 
 # ====================================================
-# 🕒 SIMPLE JWT
+# SIMPLE JWT
 # ====================================================
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=20),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
