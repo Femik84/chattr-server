@@ -3,19 +3,28 @@ from django.dispatch import receiver
 from django.conf import settings
 from posts.models import Post
 from comments.models import Comment
-from notifications.models import Notification
-from users.models import CustomUser 
+from notifications.models import Notification, FCMDevice
+from users.models import CustomUser
+from notifications.utils import send_fcm_notification
 
 User = settings.AUTH_USER_MODEL
+
+# -------------------------------
+# Helper function to send FCM to a user
+# -------------------------------
+def notify_user(user, title: str, body: str, data: dict = None):
+    tokens = FCMDevice.objects.filter(user=user).values_list("token", flat=True)
+    for token in tokens:
+        send_fcm_notification(token, title, body, data)
 
 
 # 1️⃣ When a user likes a post
 @receiver(m2m_changed, sender=Post.likes.through)
 def create_like_notification(sender, instance, action, pk_set, **kwargs):
     if action == "post_add":
+        to_user = instance.user
         for user_id in pk_set:
             from_user = instance.likes.get(pk=user_id)
-            to_user = instance.user
             if from_user != to_user:
                 Notification.objects.create(
                     from_user=from_user,
@@ -23,6 +32,13 @@ def create_like_notification(sender, instance, action, pk_set, **kwargs):
                     notification_type="like",
                     post=instance,
                     message=f"{from_user.username} liked your post."
+                )
+                # Send push notification
+                notify_user(
+                    to_user,
+                    title="New Like",
+                    body=f"{from_user.username} liked your post",
+                    data={"type": "like", "post_id": str(instance.id)}
                 )
 
 
@@ -40,6 +56,13 @@ def create_comment_notification(sender, instance, created, **kwargs):
                 post=instance.post,
                 comment=instance,
                 message=f"{from_user.username} commented: {instance.content[:30]}"
+            )
+            # Send push notification
+            notify_user(
+                to_user,
+                title="New Comment",
+                body=f"{from_user.username} commented: {instance.content[:30]}",
+                data={"type": "comment", "post_id": str(instance.post.id)}
             )
 
 
@@ -60,6 +83,13 @@ def create_follow_notification(sender, instance, action, pk_set, **kwargs):
                     to_user=to_user,
                     notification_type="follow",
                     message=f"{from_user.username} started following you."
+                )
+                # Send push notification
+                notify_user(
+                    to_user,
+                    title="New Follower",
+                    body=f"{from_user.username} started following you",
+                    data={"type": "follow"}
                 )
 
     elif action == "post_remove":

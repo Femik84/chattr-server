@@ -2,7 +2,7 @@ from rest_framework import serializers
 from django.contrib.auth import get_user_model
 from posts.models import Post, PostImage
 from comments.models import Comment
-from .models import Notification
+from .models import Notification, FCMDevice
 
 User = get_user_model()
 
@@ -11,17 +11,17 @@ User = get_user_model()
 # User Serializer (Mini)
 # -------------------------------
 class UserMiniSerializer(serializers.ModelSerializer):
+    profile_picture = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = ["id", "username", "first_name", "last_name", "profile_picture"]
 
-    def to_representation(self, instance):
-        data = super().to_representation(instance)
+    def get_profile_picture(self, instance):
         request = self.context.get("request")
-
         if instance.profile_picture and request:
-            data["profile_picture"] = request.build_absolute_uri(instance.profile_picture.url)
-        return data
+            return request.build_absolute_uri(instance.profile_picture.url)
+        return None
 
 
 # -------------------------------
@@ -86,14 +86,46 @@ class NotificationSerializer(serializers.ModelSerializer):
         ]
 
     def get_message(self, obj):
-        username = obj.from_user.username
+        username = obj.from_user.username if obj.from_user else "Someone"
 
         if obj.notification_type == "like":
             return f"{username} liked your post."
         elif obj.notification_type == "comment":
             if obj.comment:
-                return f"{username} commented: {obj.comment.content}"
+                content_preview = obj.comment.content[:30]
+                return f"{username} commented: {content_preview}"
             return f"{username} commented on your post."
         elif obj.notification_type == "follow":
             return f"{username} started following you."
         return "You have a new notification."
+
+
+# -------------------------------
+# FCM Device Serializer
+# -------------------------------
+class FCMDeviceSerializer(serializers.ModelSerializer):
+    token = serializers.CharField(
+        max_length=512,
+        required=True,
+    )
+
+    class Meta:
+        model = FCMDevice
+        fields = ["token"]
+
+    def create(self, validated_data):
+        token = validated_data["token"]
+        user = self.context["request"].user
+
+        # Idempotent creation/updating
+        device, created = FCMDevice.objects.get_or_create(
+            token=token,
+            defaults={"user": user}
+        )
+
+        # Update user if token already exists
+        if not created and device.user != user:
+            device.user = user
+            device.save()
+
+        return device

@@ -9,6 +9,7 @@ from .views import (
     PasswordResetConfirmView,
     FollowToggleView,
     UserDetailView,
+    LogoutView,  
 )
 
 urlpatterns = [
@@ -18,6 +19,9 @@ urlpatterns = [
     # Email/password auth
     path("signup/", EmailSignupView.as_view(), name="email-signup"),
     path("login/", EmailLoginView.as_view(), name="email-login"),
+
+    # Logout
+    path("logout/", LogoutView.as_view(), name="logout"),  # <-- new endpoint
 
     # Password reset
     path("password-reset/request/", PasswordResetRequestView.as_view(), name="password-reset-request"),
@@ -32,6 +36,6 @@ urlpatterns = [
     # Follow/unfollow user
     path("follow/<int:user_id>/", FollowToggleView.as_view(), name="follow-toggle"),
      
-    # get user by username 
+    # Get user by username 
     path("<str:username>/", UserDetailView.as_view(), name="user-detail"),
 ]

@@ -8,8 +8,9 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.parsers import MultiPartParser, FormParser 
+from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 from .serializers import (
     UserSerializer,
@@ -19,8 +20,26 @@ from .serializers import (
     PasswordResetConfirmSerializer,
 )
 
+from notifications.models import FCMDevice  # <<-- ensure this import points to your notifications app
+
 User = get_user_model()
 GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID
+
+
+def attach_fcm_to_user_if_provided(request, user):
+    """
+    If client sent `fcm_token` in request.data, attach it to the provided user
+    (idempotent — updates owner if token already existed).
+    """
+    token = request.data.get("fcm_token") or request.data.get("fcmToken")
+    if not token:
+        return None
+
+    device, created = FCMDevice.objects.get_or_create(token=token, defaults={"user": user})
+    if not created and device.user != user:
+        device.user = user
+        device.save()
+    return device
 
 
 # -----------------------------
@@ -53,6 +72,9 @@ class GoogleAuthView(APIView):
                 },
             )
 
+            # Attach device token if provided
+            attach_fcm_to_user_if_provided(request, user)
+
             refresh = RefreshToken.for_user(user)
             serializer = UserSerializer(user, context={"request": request})
             return Response(
@@ -80,6 +102,9 @@ class EmailSignupView(APIView):
             user = serializer.save()
             user.is_email_verified = True
             user.save()
+
+            # Attach device token if provided
+            attach_fcm_to_user_if_provided(request, user)
 
             refresh = RefreshToken.for_user(user)
             user_data = UserSerializer(user, context={"request": request}).data
@@ -125,6 +150,9 @@ class EmailLoginView(APIView):
 
         if not user.is_email_verified:
             return Response({"detail": "Email not verified."}, status=status.HTTP_403_FORBIDDEN)
+
+        # Attach device token if provided (idempotent)
+        attach_fcm_to_user_if_provided(request, user)
 
         refresh = RefreshToken.for_user(user)
         serializer = UserSerializer(user, context={"request": request})
@@ -207,6 +235,52 @@ class PasswordResetConfirmView(APIView):
 
 
 # -----------------------------
+# LOGOUT (removes FCM token)
+# -----------------------------
+class LogoutView(APIView):
+    """
+    Logs out the user and removes FCM token(s) as requested.
+
+    Expected request body (examples):
+      { "refresh": "<refresh_token>", "fcm_token": "<device_fcm_token>" }
+    Behavior:
+      - If `fcm_token` provided: delete only that token (so a new user of same device can register it).
+      - If `fcm_token` NOT provided: delete ALL FCMDevice records for this user (useful for sign out everywhere).
+      - Blacklist the refresh token (if provided).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        fcm_token = request.data.get("fcm_token") or request.data.get("fcmToken")
+        removed_count = 0
+
+        if fcm_token:
+            removed_count, _ = FCMDevice.objects.filter(token=fcm_token).delete()
+        else:
+            # No token provided → remove all tokens owned by this user.
+            # Change to a different behavior if you prefer only client-specified tokens removed.
+            removed_count, _ = FCMDevice.objects.filter(user=request.user).delete()
+
+        # Blacklist refresh token if provided (SimpleJWT)
+        refresh_token = request.data.get("refresh")
+        if refresh_token:
+            try:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+            except Exception:
+                # ignore errors but return info
+                pass
+
+        return Response(
+            {
+                "detail": "Logged out successfully.",
+                "fcm_tokens_removed": removed_count,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+# -----------------------------
 # GET USER BY USERNAME
 # -----------------------------
 class UserDetailView(APIView):
@@ -220,4 +294,3 @@ class UserDetailView(APIView):
 
         serializer = UserSerializer(user, context={"request": request})
         return Response(serializer.data, status=status.HTTP_200_OK)
-

@@ -3,10 +3,11 @@ from django.conf import settings
 from posts.models import Post
 from comments.models import Comment
 
-
 User = settings.AUTH_USER_MODEL
 
-
+# -------------------------------
+# Existing Notification model
+# -------------------------------
 class Notification(models.Model):
     class NotificationType(models.TextChoices):
         FOLLOW = "follow", "Follow"
@@ -37,3 +38,16 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.from_user} → {self.to_user} ({self.notification_type})"
+
+
+# -------------------------------
+# New model: FCMDevice
+# -------------------------------
+class FCMDevice(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="fcm_devices")
+    token = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.token}"
