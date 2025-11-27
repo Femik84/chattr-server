@@ -21,7 +21,7 @@ urlpatterns = [
     path("login/", EmailLoginView.as_view(), name="email-login"),
 
     # Logout
-    path("logout/", LogoutView.as_view(), name="logout"),  # <-- new endpoint
+    path("logout/", LogoutView.as_view(), name="logout"),  
 
     # Password reset
     path("password-reset/request/", PasswordResetRequestView.as_view(), name="password-reset-request"),

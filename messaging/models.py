@@ -6,14 +6,11 @@ from django.utils import timezone
 
 class ConversationManager(models.Manager):
     def get_or_create_1on1(self, user_a, user_b):
-        """Return an existing 1-on-1 conversation between two users or create it.
-
-        This method enforces an ordering so (user1, user2) uniqueness is stable.
-        """
+        """Return an existing 1-on-1 conversation or create it."""
         if user_a.id == user_b.id:
-            raise ValueError("Cannot create a conversation with the same user as both participants")
+            raise ValueError("Cannot create a conversation with yourself")
 
-        # enforce stable ordering to make unique constraint simple
+        # enforce canonical ordering
         if user_a.id < user_b.id:
             user1, user2 = user_a, user_b
         else:
@@ -28,12 +25,6 @@ class ConversationManager(models.Manager):
 
 
 class Conversation(models.Model):
-    """A 1-on-1 conversation between exactly two users.
-
-    We store user1 and user2 in a canonical order (user1.id < user2.id) to
-    ensure a unique pair per conversation.
-    """
-
     user1 = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         related_name="conversations_as_user1",
@@ -45,7 +36,6 @@ class Conversation(models.Model):
         on_delete=models.CASCADE,
     )
 
-    # optional: cache of the most recent message for fast chat-list queries
     last_message = models.ForeignKey(
         "Message",
         related_name="+",
@@ -63,23 +53,21 @@ class Conversation(models.Model):
         constraints = [
             models.UniqueConstraint(fields=["user1", "user2"], name="unique_1on1_conversation"),
             models.CheckConstraint(check=~Q(user1=F("user2")), name="no_self_conversation"),
-
         ]
         indexes = [models.Index(fields=["updated_at"])]
 
     def save(self, *args, **kwargs):
-        # ensure canonical ordering before saving
+        # Ensure canonical ordering
         if self.user1_id and self.user2_id and self.user1_id > self.user2_id:
             self.user1, self.user2 = self.user2, self.user1
         super().save(*args, **kwargs)
 
     def other_user(self, user):
-        """Return the other participant for a given user instance."""
         if user == self.user1:
             return self.user2
         if user == self.user2:
             return self.user1
-        raise ValueError("User is not a participant in this conversation")
+        raise ValueError("User is not part of this conversation")
 
     def __str__(self):
         return f"Conversation({self.user1} <-> {self.user2})"
@@ -94,9 +82,27 @@ class Message(models.Model):
     )
 
     text = models.TextField(blank=True)
+
+    # LOCAL FILE — Optional
     file = models.FileField(upload_to="attachments/%Y/%m/%d/", null=True, blank=True)
 
-    # read receipt for the recipient (since 1-on-1, a single flag is sufficient)
+    # ⭐ CLOUDINARY URL — Optional
+    cloudinary_url = models.URLField(
+        max_length=500,
+        null=True,
+        blank=True,
+        help_text="URL to Cloudinary-hosted file"
+    )
+
+    # File type: image, audio, video, document, file
+    file_type = models.CharField(
+        max_length=20,
+        null=True,
+        blank=True,
+        help_text="Type of file: image, audio, video, document, or file"
+    )
+
+    # Read receipts
     is_read = models.BooleanField(default=False)
     read_at = models.DateTimeField(null=True, blank=True)
 
@@ -117,12 +123,16 @@ class Message(models.Model):
         is_new = self.pk is None
         super().save(*args, **kwargs)
 
-        # update conversation.last_message and touch updated_at on new messages
+        # Update conversation.last_message only for new messages
         if is_new:
-            Conversation.objects.filter(pk=self.conversation_id).update(last_message_id=self.pk, updated_at=timezone.now())
+            Conversation.objects.filter(pk=self.conversation_id).update(
+                last_message_id=self.pk,
+                updated_at=timezone.now()
+            )
 
     def __str__(self):
-        preview = (self.text[:50] + "...") if self.text and len(self.text) > 50 else (self.text or "<attachment>")
+        preview = (
+            self.text[:50] + "..." if self.text and len(self.text) > 50
+            else self.text or "<attachment>"
+        )
         return f"Message({self.sender}, {preview})"
-
-
