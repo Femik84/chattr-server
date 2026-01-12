@@ -20,6 +20,7 @@ DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = [
     '192.168.43.110',
+    '192.168.43.158',
     'localhost',
     '127.0.0.1',
     "chattr-server-cukt.onrender.com",
