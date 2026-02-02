@@ -1,8 +1,11 @@
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
+
 from .models import Post, PostImage, Hashtag
-from comments.models import Comment
 from comments.serializers import CommentSerializer
-from users.serializers import UserSerializer  
+from users.serializers import UserSerializer  # ensure this serializer is lightweight for lists
+
+User = get_user_model()
 
 
 # ------------------------------- 
@@ -24,15 +27,18 @@ class HashtagSerializer(serializers.ModelSerializer):
 
 
 # -------------------------------
-# Post Serializer (for reading)
+# Post Serializer used for list endpoints (lightweight)
 # -------------------------------
-class PostSerializer(serializers.ModelSerializer):
+class PostListSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     images = PostImageSerializer(many=True, read_only=True)
-    likes_count = serializers.IntegerField(source="likes.count", read_only=True)
+    hashtags = HashtagSerializer(many=True, read_only=True)
+
+    # annotated fields (added in queryset) or fallback
+    likes_count = serializers.IntegerField(read_only=True)
+    comments_count = serializers.IntegerField(read_only=True)
+
     is_liked = serializers.SerializerMethodField()
-    comments = serializers.SerializerMethodField()
-    hashtags = HashtagSerializer(many=True, read_only=True)  # 🔹 include hashtags
 
     class Meta:
         model = Post
@@ -42,19 +48,36 @@ class PostSerializer(serializers.ModelSerializer):
             "content",
             "images",
             "likes_count",
+            "comments_count",
             "is_liked",
-            "comments",
-            "hashtags",  # 🔹 new field
+            "hashtags",
             "created_at",
         ]
 
     def get_is_liked(self, obj):
-        user = self.context.get("request").user
-        return user in obj.likes.all() if user.is_authenticated else False
+        request = self.context.get("request", None)
+        user = getattr(request, "user", None)
+        if not user or not user.is_authenticated:
+            return False
 
-    def get_comments(self, obj):
-        comments = Comment.objects.filter(post=obj).order_by("-created_at")
-        return CommentSerializer(comments, many=True, context=self.context).data
+        # Try to read prefetched likes (fast, no DB hit)
+        prefetched = getattr(obj, "_prefetched_objects_cache", {}).get("likes", None)
+        if prefetched is not None:
+            return any(u.id == user.id for u in prefetched)
+
+        # Fallback to DB hit (only when necessary)
+        return obj.likes.filter(id=user.id).exists()
+
+
+# -------------------------------
+# Post Serializer used for detail endpoint (includes comments)
+# -------------------------------
+class PostDetailSerializer(PostListSerializer):
+    comments = CommentSerializer(many=True, read_only=True)
+
+    class Meta(PostListSerializer.Meta):
+        # Keep all fields from list serializer and add comments
+        fields = PostListSerializer.Meta.fields + ["comments"]
 
 
 # -------------------------------
@@ -89,7 +112,16 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
         # Handle hashtags
         for tag_name in hashtags_data:
-            hashtag, created = Hashtag.objects.get_or_create(name=tag_name.lower())
+            hashtag, _created = Hashtag.objects.get_or_create(name=tag_name.lower())
             post.hashtags.add(hashtag)
 
         return post
+
+
+# -------------------------------
+# Compatibility alias
+# -------------------------------
+# Some code (e.g. search.views) still imports `PostSerializer`. Provide an alias
+# so existing imports keep working. Point it to the detail serializer so callers
+# get the richer representation.
+PostSerializer = PostDetailSerializer

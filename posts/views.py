@@ -1,20 +1,52 @@
-from rest_framework import generics, status
+from django.shortcuts import get_object_or_404
+from django.db.models import Count, Prefetch
+from django.contrib.auth import get_user_model
+
+from rest_framework import generics
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
-from django.shortcuts import get_object_or_404
 
 from .models import Post, Hashtag
-from .serializers import PostSerializer, PostCreateSerializer
+from .serializers import (
+    PostListSerializer,
+    PostDetailSerializer,
+    PostCreateSerializer,
+)
+
+User = get_user_model()
+
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 50
 
 
 # -------------------------------
-# List all posts (feed)
+# List all posts (feed) -- optimized
 # -------------------------------
 class PostListView(generics.ListAPIView):
-    serializer_class = PostSerializer
-    queryset = Post.objects.all().order_by("-created_at")
+    serializer_class = PostListSerializer
+    pagination_class = StandardResultsSetPagination
+
+    def get_queryset(self):
+        qs = (
+            Post.objects.select_related("user")
+            .prefetch_related(
+                "images",                # reverse FK to PostImage
+                "hashtags",              # M2M
+                Prefetch("likes", queryset=User.objects.only("id")),  # prefetch minimal user fields
+            )
+            .annotate(
+                likes_count=Count("likes", distinct=True),
+                comments_count=Count("comments", distinct=True),
+            )
+            .order_by("-created_at")
+        )
+        return qs
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -23,11 +55,25 @@ class PostListView(generics.ListAPIView):
 
 
 # -------------------------------
-# Retrieve a single post
+# Retrieve a single post (detail) - prefetch comments for the detail view
 # -------------------------------
 class PostDetailView(generics.RetrieveAPIView):
-    serializer_class = PostSerializer
-    queryset = Post.objects.all()
+    serializer_class = PostDetailSerializer
+
+    def get_queryset(self):
+        return (
+            Post.objects.select_related("user")
+            .prefetch_related(
+                "images",
+                "hashtags",
+                Prefetch("likes", queryset=User.objects.only("id")),
+                Prefetch("comments__user"),  # prefetch comment user for serializer
+            )
+            .annotate(
+                likes_count=Count("likes", distinct=True),
+                comments_count=Count("comments", distinct=True),
+            )
+        )
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -84,14 +130,28 @@ class PostDeleteView(generics.DestroyAPIView):
 
 
 # -------------------------------
-# Get all posts for a specific username
+# Get all posts for a specific username (optimized)
 # -------------------------------
 class UserPostsView(generics.ListAPIView):
-    serializer_class = PostSerializer
+    serializer_class = PostListSerializer
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         username = self.kwargs.get("username")
-        return Post.objects.filter(user__username=username).order_by("-created_at")
+        return (
+            Post.objects.filter(user__username=username)
+            .select_related("user")
+            .prefetch_related(
+                "images",
+                "hashtags",
+                Prefetch("likes", queryset=User.objects.only("id")),
+            )
+            .annotate(
+                likes_count=Count("likes", distinct=True),
+                comments_count=Count("comments", distinct=True),
+            )
+            .order_by("-created_at")
+        )
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -100,15 +160,28 @@ class UserPostsView(generics.ListAPIView):
 
 
 # -------------------------------
-# ✅ New: Get all posts for a specific hashtag
+# Get all posts for a specific hashtag (optimized)
 # -------------------------------
 class HashtagPostsView(generics.ListAPIView):
-    serializer_class = PostSerializer
+    serializer_class = PostListSerializer
+    pagination_class = StandardResultsSetPagination
 
     def get_queryset(self):
         hashtag_name = self.kwargs.get("name").lower()
         hashtag = get_object_or_404(Hashtag, name=hashtag_name)
-        return hashtag.posts.all().order_by("-created_at")
+        return (
+            hashtag.posts.all()
+            .select_related("user")
+            .prefetch_related(
+                "images",
+                Prefetch("likes", queryset=User.objects.only("id")),
+            )
+            .annotate(
+                likes_count=Count("likes", distinct=True),
+                comments_count=Count("comments", distinct=True),
+            )
+            .order_by("-created_at")
+        )
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
