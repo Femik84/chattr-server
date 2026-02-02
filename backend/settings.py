@@ -3,6 +3,7 @@ from datetime import timedelta
 from dotenv import load_dotenv
 import cloudinary
 import os
+import dj_database_url
 
 # Load .env
 load_dotenv()
@@ -97,11 +98,13 @@ ASGI_APPLICATION = "backend.asgi.application"
 # DATABASE
 # ====================================================
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": dj_database_url.config(
+        default=os.getenv("DATABASE_URL"),
+        conn_max_age=600,
+        ssl_require=True,
+    )
 }
+
 
 # ====================================================
 # PASSWORD VALIDATORS
