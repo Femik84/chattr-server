@@ -10,7 +10,8 @@ urlpatterns = [
     path("api/", include("comments.urls")),
     path("api/notifications/", include("notifications.urls")),
     path("api/", include("messaging.urls")),
-    path("api/search/", include("search.urls"))
+    path("api/search/", include("search.urls")),
+    path("api/health/", include("core.urls")),
 ]
 
 if settings.DEBUG:
