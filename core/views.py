@@ -1,11 +1,13 @@
 from django.http import JsonResponse
 from django.db import connection
-from django_redis import get_redis_connection
+from channels_redis.core import RedisChannelLayer
+import os
 
 
 def health_check(request):
+
     # -------------------
-    # PostgreSQL ping
+    # DB check
     # -------------------
     try:
         with connection.cursor() as cursor:
@@ -16,11 +18,21 @@ def health_check(request):
         db_status = "fail"
 
     # -------------------
-    # Redis ping
+    # REDIS check (Channels-compatible)
     # -------------------
     try:
-        redis_conn = get_redis_connection("default")
-        redis_conn.ping()
+        from channels_redis.core import RedisChannelLayer
+
+        channel_layer = RedisChannelLayer(
+            {
+                "hosts": [os.getenv("REDIS_URL")],
+            }
+        )
+
+        # simple ping
+        conn = channel_layer.connection(False)
+        conn.ping()
+
         redis_status = "ok"
     except Exception:
         redis_status = "fail"
